@@ -1,0 +1,17 @@
+<%@ page import="java.util.*,app.Db" contentType="text/html;charset=UTF-8" buffer="64kb" %>
+<%
+request.setCharacterEncoding("UTF-8");
+Map<String,String> me=Db.me(session);
+if(me==null){response.sendRedirect("login.jsp");return;}
+String role=me.get("role");
+String[][] nav="admin".equals(role)
+ ?new String[][]{{"dashboard","Home"},{"users","Users"},{"exams","Exams"},{"top","Top"},{"feedback","Feedback"},{"profile","Profile"}}
+ :new String[][]{{"dashboard","Home"},{"exams","Exams"},{"results","student".equals(role)?"Results":"Grading"},{"top","Top"},{"materials","Material"},{"feedback","Feedback"},{"profile","Profile"}};
+String cur=request.getServletPath();
+%>
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ExamHub</title><link rel="stylesheet" href="style.css"></head>
+<body>
+<header><b>ExamHub</b><span><%=Db.h(me.get("name"))%> (<%=role%>)</span><a class="btn s" href="logout.jsp">Logout</a></header>
+<nav><% for(String[] n:nav){ %><a class="<%=cur.endsWith("/"+n[0]+".jsp")?"on":""%>" href="<%=n[0]%>.jsp"><%=n[1]%></a><% } %></nav>
+<main>

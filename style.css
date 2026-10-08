@@ -1,0 +1,28 @@
+*{box-sizing:border-box}
+body{margin:0;font:16px/1.5 system-ui,sans-serif;background:#edf1f0;color:#12201e}
+h1,h2,h3{font-family:Georgia,serif;margin:.4em 0}
+header{display:flex;gap:10px;align-items:center;padding:12px 16px;background:#0f4c45;color:#fff;flex-wrap:wrap}
+header span{margin-left:auto;font-size:14px}
+nav{display:flex;overflow-x:auto;background:#fff;box-shadow:0 1px 4px #0002;position:sticky;top:0}
+nav a{padding:12px 16px;white-space:nowrap;color:#4b5f5c;text-decoration:none;border-bottom:3px solid transparent;flex:1;text-align:center}
+nav a.on{color:#0f4c45;border-color:#e9b949;font-weight:700}
+main{max-width:900px;margin:auto;padding:16px}
+.card{background:#fff;border-radius:10px;padding:16px;margin:0 0 12px;border-left:4px solid #0f4c45}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+.st{text-align:center}
+.st b{display:block;font:700 34px Georgia,serif;color:#0f4c45}
+input,select,textarea,button{width:100%;font:inherit;padding:10px 12px;margin:6px 0;border:1px solid #b9c8c5;border-radius:6px;background:#fff;color:inherit}
+button{background:#0f4c45;color:#fff;border:0;cursor:pointer;font-weight:600}
+button.d{background:#b3261e;width:auto;padding:8px 14px}
+.btn{display:inline-block;text-decoration:none;background:#0f4c45;color:#fff;padding:8px 14px;border-radius:6px}
+.btn.s{background:#e9b949;color:#12201e}
+.box{max-width:420px;margin:24px auto;background:#fff;padding:20px;border-radius:10px}
+.op{display:flex;gap:10px;align-items:center;padding:10px;border:1px solid #d5dfdd;border-radius:6px;margin:6px 0}
+.op input{width:auto;margin:0}
+.row{display:flex;justify-content:space-between;gap:8px;padding:10px 0;border-bottom:1px solid #e2e9e8;flex-wrap:wrap}
+.clk{position:sticky;top:48px;background:#e9b949;padding:8px;border-radius:6px;text-align:center;font-weight:700;margin-bottom:12px}
+.tag{background:#fde7a8;padding:2px 8px;border-radius:99px;font-size:12px}
+.mut{color:#5d6f6c}
+.sm{font-size:14px}
+.err{color:#b3261e}
+:focus-visible{outline:3px solid #e9b949;outline-offset:2px}
