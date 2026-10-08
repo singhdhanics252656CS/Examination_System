@@ -50,3 +50,4 @@ button.d:hover{background:#b42318}
 .err{color:var(--red);font-weight:600}
 :focus-visible{outline:3px solid var(--hl);outline-offset:2px}
 @media(min-width:700px){main{padding:28px 24px 60px}h2{font-size:34px}}
+.box p.sm{display:none}
