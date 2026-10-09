@@ -3,6 +3,7 @@ package app;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 import jakarta.servlet.http.HttpSession;
+import jakarta.servlet.http.Part;
 import java.nio.file.*;
 import java.util.*;
 
@@ -11,6 +12,8 @@ public class Db {
     static final Path F = Paths.get(System.getProperty("java.io.tmpdir"), "examhub.json");
     static Map<String, List<Map<String, String>>> d;
     static int seq = 0;
+    public static final Path DIR = Paths.get(System.getProperty("java.io.tmpdir"), "examhub-files");
+    static final Set<String> OK = new HashSet<>(Arrays.asList("jpg", "jpeg", "png", "gif", "webp", "pdf", "txt", "doc", "docx", "ppt", "pptx", "xls", "xlsx", "csv", "zip"));
 
     public static Map<String, String> row(String... kv) {
         Map<String, String> m = new LinkedHashMap<>();
@@ -25,7 +28,7 @@ public class Db {
             } catch (Exception e) {
                 d = new HashMap<>();
             }
-            for (String k : new String[]{"users", "exams", "results", "feedback", "materials"}) d.putIfAbsent(k, new ArrayList<>());
+            for (String k : new String[]{"users", "exams", "results", "feedback", "materials", "files"}) d.putIfAbsent(k, new ArrayList<>());
             if (d.get("users").isEmpty()) seed();
         }
         return d.get(n);
@@ -95,6 +98,20 @@ public class Db {
         return G.fromJson(r.get("g"), new TypeToken<Map<String, String>>() {}.getType());
     }
 
+    public static Map<String, String> files(Map<String, String> r) {
+        String s = r.get("f");
+        if (s == null) return new HashMap<>();
+        return G.fromJson(s, new TypeToken<Map<String, String>>() {}.getType());
+    }
+
+    static boolean same(String x, String y) {
+        if (y == null) return false;
+        Set<String> a = new TreeSet<>(Arrays.asList(x.split(",")));
+        Set<String> b = new TreeSet<>();
+        for (String v : y.split(",")) if (!v.trim().isEmpty()) b.add(v.trim());
+        return a.equals(b);
+    }
+
     public static int[] score(Map<String, String> r) {
         Map<String, String> e = find("exams", "id", r.get("exam"));
         if (e == null) return new int[]{0, 0, 0};
@@ -103,13 +120,86 @@ public class Db {
         Map<String, String> g = grades(r);
         int got = 0, tot = 0, pend = 0;
         for (int i = 0; i < q.size(); i++) {
+            String t = q.get(i).get("t");
             int m = num(q.get(i).get("m"), 1);
             tot += m;
-            if ("mcq".equals(q.get(i).get("t"))) {
-                if (i < a.size() && q.get(i).get("a").equals(a.get(i))) got += m;
+            if ("mcq".equals(t) || "multi".equals(t)) {
+                if (i < a.size() && same(q.get(i).get("a"), a.get(i))) got += m;
             } else if (g.containsKey("" + i)) got += num(g.get("" + i), 0);
             else pend = 1;
         }
         return new int[]{got, tot, pend};
     }
-}
+
+    public static List<Map<String, String>> cleanQs(String json) {
+        List<Map<String, String>> out = new ArrayList<>();
+        try {
+            List<Map<String, String>> in = G.fromJson(json, new TypeToken<List<Map<String, String>>>() {}.getType());
+            for (Map<String, String> x : in) {
+                String t = String.valueOf(x.get("t")), q = String.valueOf(x.get("q")).trim();
+                int m = Math.max(1, Math.min(100, num(x.get("m"), 1)));
+                if (q.isEmpty() || q.equals("null")) continue;
+                Map<String, String> o = row("t", t, "q", q, "m", "" + m);
+                if (t.equals("mcq") || t.equals("multi")) {
+                    boolean bad = false;
+                    for (int i = 0; i < 4; i++) {
+                        String v = String.valueOf(x.get("o" + i)).trim();
+                        if (v.isEmpty() || v.equals("null")) bad = true;
+                        o.put("o" + i, v);
+                    }
+                    TreeSet<String> sel = new TreeSet<>();
+                    for (String p : String.valueOf(x.get("a")).split(",")) if (p.trim().matches("[0-3]")) sel.add(p.trim());
+                    if (bad || sel.isEmpty() || (t.equals("mcq") && sel.size() != 1)) continue;
+                    o.put("a", String.join(",", sel));
+                } else if (!t.equals("long") && !t.equals("file")) continue;
+                out.add(o);
+            }
+        } catch (Exception e) {
+        }
+        return out;
+    }
+
+    public static String saveFile(Part p, String owner, String kind, String exam) {
+        try {
+            if (p == null || p.getSize() == 0) return "";
+            if (p.getSize() > 5L * 1024 * 1024) throw new IllegalArgumentException("A file is larger than 5 MB.");
+            String name = Paths.get(String.valueOf(p.getSubmittedFileName())).getFileName().toString().replaceAll("[^A-Za-z0-9._ -]", "_");
+            int dot = name.lastIndexOf('.');
+            String ext = dot < 0 ? "" : name.substring(dot + 1).toLowerCase();
+            if (!OK.contains(ext)) throw new IllegalArgumentException("This file type is not allowed. Use a photo, PDF, Word, PowerPoint, Excel, text or zip file.");
+            Files.createDirectories(DIR);
+            String id = id();
+            try (java.io.InputStream in = p.getInputStream()) {
+                Files.copy(in, DIR.resolve(id + "." + ext), StandardCopyOption.REPLACE_EXISTING);
+            }
+            t("files").add(row("id", id, "name", name, "ext", ext, "owner", owner, "kind", kind, "exam", exam));
+            save();
+            return id;
+        } catch (java.io.IOException e) {
+            throw new IllegalStateException("Could not save the file.");
+        }
+    }
+
+    public static void dropFile(String fid) {
+        Map<String, String> f = find("files", "id", fid);
+        if (f == null) return;
+        t("files").remove(f);
+        try {
+            Files.deleteIfExists(DIR.resolve(fid + "." + f.get("ext")));
+        } catch (Exception e) {
+        }
+    }
+
+    public static void dropFilesWhere(String key, String val) {
+        for (Map<String, String> f : new ArrayList<>(t("files"))) if (val.equals(f.get(key))) dropFile(f.get("id"));
+    }
+
+    public static String fileHtml(String fid) {
+        Map<String, String> f = find("files", "id", fid);
+        if (f == null) return "";
+        String ext = f.get("ext"), nm = h(f.get("name"));
+        boolean img = ext.equals("jpg") || ext.equals("jpeg") || ext.equals("png") || ext.equals("gif") || ext.equals("webp");
+        String url = "f?id=" + f.get("id");
+        return (img ? "<img class=\"pic\" src=\"" + url + "\" alt=\"" + nm + "\"><br>" : "") + "<a href=\"" + url + "\">" + (img ? "Open photo: " : "Download: ") + nm + "</a>";
+    }
+                                                              }
