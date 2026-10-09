@@ -51,3 +51,8 @@ button.d:hover{background:#b42318}
 :focus-visible{outline:3px solid var(--hl);outline-offset:2px}
 @media(min-width:700px){main{padding:28px 24px 60px}h2{font-size:34px}}
 .box p.sm{display:none}
+.orow{display:flex;gap:10px;align-items:center}
+.orow input.ot{flex:1;min-width:0}
+.orow input[type=checkbox]{flex:none;width:24px;height:24px;margin:0}
+.op.ck::before{border-radius:8px}
+.pic{display:block;max-width:100%;max-height:320px;border-radius:10px;border:1.5px solid var(--line);margin:8px 0}

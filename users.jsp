@@ -7,6 +7,7 @@ if("POST".equals(request.getMethod())){
  if(u!=null&&!uid.equals(me.get("id"))){
   Db.t("users").remove(u);
   Db.t("results").removeIf(r->uid.equals(r.get("stu")));
+  Db.dropFilesWhere("owner",uid);
   Db.save();
  }
  response.sendRedirect("users.jsp");return;

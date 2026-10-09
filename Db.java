@@ -202,4 +202,4 @@ public class Db {
         String url = "f?id=" + f.get("id");
         return (img ? "<img class=\"pic\" src=\"" + url + "\" alt=\"" + nm + "\"><br>" : "") + "<a href=\"" + url + "\">" + (img ? "Open photo: " : "Download: ") + nm + "</a>";
     }
-                                                              }
+}

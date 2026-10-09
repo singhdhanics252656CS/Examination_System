@@ -3,22 +3,10 @@
 if("POST".equals(request.getMethod())){
  String act=request.getParameter("act");
  if("create".equals(act)&&"teacher".equals(role)){
-  List<Map<String,String>> q=new ArrayList<>();
-  for(String ln:request.getParameter("qs").split("\\r?\\n")){
-   String[] p=ln.split("\\|");
-   Map<String,String> m=new LinkedHashMap<>();
-   if(p.length>=8&&p[0].trim().equals("mcq")){
-    m.put("t","mcq");m.put("q",p[1].trim());
-    for(int i=0;i<4;i++)m.put("o"+i,p[2+i].trim());
-    m.put("a",""+(Math.max(1,Math.min(4,Db.num(p[6],1)))-1));
-    m.put("m",""+Db.num(p[7],1));q.add(m);
-   }else if(p.length>=3&&p[0].trim().equals("long")){
-    m.put("t","long");m.put("q",p[1].trim());m.put("m",""+Db.num(p[2],1));q.add(m);
-   }
-  }
-  String title=request.getParameter("title").trim();
+  List<Map<String,String>> q=Db.cleanQs(request.getParameter("qjson"));
+  String title=String.valueOf(request.getParameter("title")).trim();
   if(!q.isEmpty()&&!title.isEmpty()){
-   Db.t("exams").add(Db.row("id",Db.id(),"title",title,"subject",request.getParameter("subject").trim(),"dur",""+Db.num(request.getParameter("dur"),15),"by",me.get("id"),"q",Db.G.toJson(q)));
+   Db.t("exams").add(Db.row("id",Db.id(),"title",title,"subject",String.valueOf(request.getParameter("subject")).trim(),"dur",""+Math.max(1,Db.num(request.getParameter("dur"),15)),"by",me.get("id"),"q",Db.G.toJson(q)));
    Db.save();
   }
  }else if("del".equals(act)){
@@ -27,6 +15,7 @@ if("POST".equals(request.getMethod())){
    String eid=e.get("id");
    Db.t("exams").remove(e);
    Db.t("results").removeIf(r->eid.equals(r.get("exam")));
+   Db.dropFilesWhere("exam",eid);
    Db.save();
   }
  }
@@ -35,10 +24,20 @@ if("POST".equals(request.getMethod())){
 %>
 <h2>Exams</h2>
 <% if("teacher".equals(role)){ %>
-<form class="card" method="post"><h3>Create exam</h3><input type="hidden" name="act" value="create">
+<div class="card"><h3>Create exam</h3>
+<form method="post" id="xf"><input type="hidden" name="act" value="create"><input type="hidden" name="qjson" id="qjson">
 <input name="title" placeholder="Exam title" required><input name="subject" placeholder="Subject" required><input name="dur" type="number" min="1" value="15" placeholder="Minutes">
-<textarea name="qs" rows="7" required placeholder="One question per line:&#10;mcq|Question|A|B|C|D|correct option 1-4|marks&#10;long|Question|marks"></textarea>
-<button>Publish exam</button></form>
+<h3>Add a question</h3>
+<select id="qt"><option value="mcq">Single choice (pick one)</option><option value="multi">Checkboxes (pick several)</option><option value="long">Written answer (file or photo optional)</option><option value="file">File or photo upload only</option></select>
+<textarea id="qq" rows="2" placeholder="Question"></textarea>
+<div id="opts"><p class="mut sm">Type the options and tick the correct answer(s)</p>
+<% for(String L:new String[]{"A","B","C","D"}){%><div class="orow"><input type="checkbox" class="oc" aria-label="Correct answer"><input class="ot" placeholder="Option <%=L%>"></div><%}%>
+</div>
+<input id="qm" type="number" min="1" value="1" placeholder="Marks">
+<button type="button" class="s" id="addq">Add question</button>
+<div id="ql"></div>
+<button>Publish exam</button></form></div>
+<script src="builder.js"></script>
 <% }
 for(Map<String,String> e:Db.t("exams")){
  if("teacher".equals(role)&&!me.get("id").equals(e.get("by")))continue;

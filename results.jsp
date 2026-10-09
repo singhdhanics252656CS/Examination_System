@@ -23,7 +23,7 @@ for(Map<String,String> r:Db.t("results")){
  Map<String,String> e=Db.find("exams","id",r.get("exam"));
  int[] x=Db.score(r);%>
 <div class="card"><b><%=e==null?"Deleted exam":Db.h(e.get("title"))%></b><p class="mut sm"><%=Db.h(r.get("at"))%></p>
-<% if(x[2]==1){%><span class="tag">Long answers awaiting marks</span><%}%>
+<% if(x[2]==1){%><span class="tag">Written answers awaiting marks</span><%}%>
 <p>Score<%=x[2]==1?" so far":""%>: <b><%=x[0]%>/<%=x[1]%></b> (<%=x[1]==0?0:x[0]*100/x[1]%>%)</p></div>
 <% }
 if(!any){%><p class="mut">You have not attempted any exam yet.</p><%}
@@ -35,12 +35,17 @@ if(!any){%><p class="mut">You have not attempted any exam yet.</p><%}
  List<Map<String,String>> q=Db.qs(e);
  List<String> a=Db.answers(r);
  Map<String,String> g=Db.grades(r);
+ Map<String,String> fm=Db.files(r);
  int[] x=Db.score(r);%>
 <div class="card"><b><%=Db.h(e.get("title"))%></b>, <%=Db.h(Db.name(r.get("stu")))%>
 <p class="sm mut"><%=Db.h(r.get("at"))%>. Score <%=x[0]%>/<%=x[1]%><%=x[2]==1?" (needs grading)":""%></p>
 <% for(int i=0;i<q.size();i++){
- if(!"long".equals(q.get(i).get("t")))continue;%>
-<p class="sm"><b>Q:</b> <%=Db.h(q.get(i).get("q"))%><br><b>Answer:</b> <%=Db.h(i<a.size()?a.get(i):"")%></p>
+ String t=q.get(i).get("t");
+ if(!("long".equals(t)||"file".equals(t)))continue;
+ String txt=i<a.size()?a.get(i):"";%>
+<p class="sm"><b>Q:</b> <%=Db.h(q.get(i).get("q"))%><br>
+<% if("long".equals(t)){%><b>Answer:</b> <%=txt.isEmpty()?"(no text)":Db.h(txt)%><br><%}%>
+<%=Db.fileHtml(fm.get(""+i))%></p>
 <form method="post"><input type="hidden" name="rid" value="<%=r.get("id")%>"><input type="hidden" name="i" value="<%=i%>">
 <input type="number" name="marks" min="0" max="<%=q.get(i).get("m")%>" value="<%=g.containsKey(""+i)?g.get(""+i):""%>" placeholder="Marks out of <%=q.get(i).get("m")%>" required><button>Save marks</button></form>
 <% } %></div>
