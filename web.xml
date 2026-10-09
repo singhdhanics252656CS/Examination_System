@@ -1,4 +1,16 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <web-app xmlns="https://jakarta.ee/xml/ns/jakartaee" version="6.0">
   <welcome-file-list><welcome-file>login.jsp</welcome-file></welcome-file-list>
+  <servlet><servlet-name>files</servlet-name><servlet-class>app.FileServlet</servlet-class></servlet>
+  <servlet-mapping><servlet-name>files</servlet-name><url-pattern>/f</url-pattern></servlet-mapping>
+  <servlet>
+    <servlet-name>takeUpload</servlet-name><jsp-file>/take.jsp</jsp-file>
+    <multipart-config><max-file-size>5242880</max-file-size><max-request-size>26214400</max-request-size></multipart-config>
+  </servlet>
+  <servlet-mapping><servlet-name>takeUpload</servlet-name><url-pattern>/take.jsp</url-pattern></servlet-mapping>
+  <servlet>
+    <servlet-name>materialUpload</servlet-name><jsp-file>/materials.jsp</jsp-file>
+    <multipart-config><max-file-size>5242880</max-file-size><max-request-size>26214400</max-request-size></multipart-config>
+  </servlet>
+  <servlet-mapping><servlet-name>materialUpload</servlet-name><url-pattern>/materials.jsp</url-pattern></servlet-mapping>
 </web-app>
