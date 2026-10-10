@@ -24,8 +24,9 @@ public class Db {
     public static synchronized List<Map<String, String>> t(String n) {
         if (d == null) {
             try {
-                d = G.fromJson(Files.readString(F), new TypeToken<Map<String, List<Map<String, String>>>>() {}.getType());
+                d = G.fromJson(load(), new TypeToken<Map<String, List<Map<String, String>>>>() {}.getType());
             } catch (Exception e) {
+                if (useDb() && !"empty".equals(e.getMessage())) throw new IllegalStateException("Database unavailable: " + e.getMessage());
                 d = new HashMap<>();
             }
             for (String k : new String[]{"users", "exams", "results", "feedback", "materials", "files"}) d.putIfAbsent(k, new ArrayList<>());
@@ -47,9 +48,88 @@ public class Db {
         save();
     }
 
+    static boolean useDb() {
+        String u = System.getenv("DATABASE_URL");
+        return u != null && !u.isEmpty();
+    }
+
+    static java.sql.Connection conn() throws Exception {
+        Class.forName("org.postgresql.Driver");
+        java.net.URI uri = new java.net.URI(System.getenv("DATABASE_URL").replaceFirst("^postgres(ql)?://", "http://"));
+        String[] ui = uri.getUserInfo().split(":", 2);
+        String url = "jdbc:postgresql://" + uri.getHost() + ":" + (uri.getPort() < 0 ? 5432 : uri.getPort()) + uri.getPath() + "?sslmode=require";
+        return java.sql.DriverManager.getConnection(url, ui[0], ui[1]);
+    }
+
+    static String load() throws Exception {
+        if (!useDb()) return Files.readString(F);
+        try (java.sql.Connection c = conn(); java.sql.Statement st = c.createStatement()) {
+            st.execute("CREATE TABLE IF NOT EXISTS kv(k TEXT PRIMARY KEY, v TEXT)");
+            st.execute("CREATE TABLE IF NOT EXISTS blobs(id TEXT PRIMARY KEY, b BYTEA)");
+            try (java.sql.ResultSet r = st.executeQuery("SELECT v FROM kv WHERE k='data'")) {
+                if (r.next()) return r.getString(1);
+            }
+        }
+        throw new Exception("empty");
+    }
+
     public static synchronized void save() {
+        String json = G.toJson(d);
+        if (useDb()) {
+            try (java.sql.Connection c = conn(); java.sql.PreparedStatement p = c.prepareStatement("INSERT INTO kv(k,v) VALUES('data',?) ON CONFLICT (k) DO UPDATE SET v=EXCLUDED.v")) {
+                p.setString(1, json);
+                p.executeUpdate();
+            } catch (Exception e) {
+                throw new IllegalStateException("Could not save: " + e.getMessage());
+            }
+        } else {
+            try {
+                Files.writeString(F, json);
+            } catch (Exception e) {
+            }
+        }
+    }
+
+    static void putBlob(String id, byte[] b) throws Exception {
+        if (useDb()) {
+            try (java.sql.Connection c = conn(); java.sql.PreparedStatement p = c.prepareStatement("INSERT INTO blobs(id,b) VALUES(?,?) ON CONFLICT (id) DO UPDATE SET b=EXCLUDED.b")) {
+                p.setString(1, id);
+                p.setBytes(2, b);
+                p.executeUpdate();
+            }
+        } else {
+            Files.createDirectories(DIR);
+            Files.write(DIR.resolve(id), b);
+        }
+    }
+
+    public static byte[] blob(String id) {
         try {
-            Files.writeString(F, G.toJson(d));
+            if (useDb()) {
+                try (java.sql.Connection c = conn(); java.sql.PreparedStatement p = c.prepareStatement("SELECT b FROM blobs WHERE id=?")) {
+                    p.setString(1, id);
+                    try (java.sql.ResultSet r = p.executeQuery()) {
+                        return r.next() ? r.getBytes(1) : null;
+                    }
+                }
+            }
+            Path f = DIR.resolve(id);
+            return Files.exists(f) ? Files.readAllBytes(f) : null;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    static void delBlob(String id) {
+        try {
+            if (useDb()) {
+                try (java.sql.Connection c = conn(); java.sql.PreparedStatement p = c.prepareStatement("DELETE FROM blobs WHERE id=?")) {
+                    p.setString(1, id);
+                    p.executeUpdate();
+                }
+            } else {
+                Files.deleteIfExists(DIR.resolve(id));
+            }
         } catch (Exception e) {
         }
     }
@@ -167,15 +247,16 @@ public class Db {
             int dot = name.lastIndexOf('.');
             String ext = dot < 0 ? "" : name.substring(dot + 1).toLowerCase();
             if (!OK.contains(ext)) throw new IllegalArgumentException("This file type is not allowed. Use a photo, PDF, Word, PowerPoint, Excel, text or zip file.");
-            Files.createDirectories(DIR);
             String id = id();
             try (java.io.InputStream in = p.getInputStream()) {
-                Files.copy(in, DIR.resolve(id + "." + ext), StandardCopyOption.REPLACE_EXISTING);
+                putBlob(id, in.readAllBytes());
             }
             t("files").add(row("id", id, "name", name, "ext", ext, "owner", owner, "kind", kind, "exam", exam));
             save();
             return id;
-        } catch (java.io.IOException e) {
+        } catch (IllegalArgumentException e) {
+            throw e;
+        } catch (Exception e) {
             throw new IllegalStateException("Could not save the file.");
         }
     }
@@ -184,10 +265,7 @@ public class Db {
         Map<String, String> f = find("files", "id", fid);
         if (f == null) return;
         t("files").remove(f);
-        try {
-            Files.deleteIfExists(DIR.resolve(fid + "." + f.get("ext")));
-        } catch (Exception e) {
-        }
+        delBlob(fid);
     }
 
     public static void dropFilesWhere(String key, String val) {

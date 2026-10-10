@@ -4,8 +4,6 @@ import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.Map;
 
 public class FileServlet extends HttpServlet {
@@ -25,17 +23,17 @@ public class FileServlet extends HttpServlet {
             resp.sendError(403);
             return;
         }
-        String ext = f.get("ext");
-        Path p = Db.DIR.resolve(f.get("id") + "." + ext);
-        if (!Files.exists(p)) {
+        byte[] data = Db.blob(f.get("id"));
+        if (data == null) {
             resp.sendError(404);
             return;
         }
+        String ext = f.get("ext");
         boolean img = ext.equals("jpg") || ext.equals("jpeg") || ext.equals("png") || ext.equals("gif") || ext.equals("webp");
         resp.setContentType(img ? "image/" + (ext.equals("jpg") ? "jpeg" : ext) : "application/octet-stream");
         resp.setHeader("X-Content-Type-Options", "nosniff");
         resp.setHeader("Content-Disposition", (img ? "inline" : "attachment") + "; filename=\"" + f.get("name") + "\"");
-        resp.setContentLengthLong(Files.size(p));
-        Files.copy(p, resp.getOutputStream());
+        resp.setContentLength(data.length);
+        resp.getOutputStream().write(data);
     }
 }
